@@ -1,57 +1,84 @@
 # OpenTrust AI
 
-**Independent security checks for AI agents, designed for organizations without dedicated security teams.**
+**Independent, reproducible security checks for AI agents, designed for organizations without dedicated security teams.**
 
-OpenTrust is an early-stage, open-source initiative to help organizations understand what their AI agents can access, what actions they can take, and what can go wrong.
+**Status: Experimental local demonstration (v0.1.0).** The repository contains a runnable, credential-free security assessment against a deterministic demonstration agent. This is **not** a production security scanner, an LLM prompt-injection detector, or a security certification. No users, pilots, or detection metrics are claimed.
 
-> **Project status: Pre-prototype.** This repository documents a planned project. The first working security checks, demonstration agent, and reports are not yet implemented. There are no claimed users, pilots, or validated detection metrics.
+## What the demo does
 
-## The problem
+OpenTrust exercises a small fictional document service with three trusted principals, public/internal/restricted classifications, default-deny role policies, and per-action audit events. A deliberately hostile instruction is embedded in a public document to test whether the fixed demonstration agent treats that document as untrusted data. The test runner executes the four scenarios documented in [the threat model](docs/threat-model.md):
 
-An AI agent connected to an inbox, documents, or business APIs can do useful work, but it can also access restricted information or follow malicious instructions embedded in untrusted content. Smaller organizations often lack the time or expertise to independently test those risks.
+| ID | Test | Expected result |
+| --- | --- | --- |
+| AUTH-001 | Volunteer reads a public document | Allowed |
+| AUTH-002 | Volunteer requests a restricted document | Denied by retrieval tool |
+| INJECT-001 | Public document instructs agent to retrieve a restricted record | Instruction is not followed |
+| AUDIT-001 | Director reads a restricted document | Allowed and audited |
 
-OpenTrust aims to make practical security assessments **reproducible, understandable, and affordable**.
+Findings include test IDs, expectations, observed access, check results, metadata-only audit evidence, remediation guidance, and explicit limitations. All resources and principals are synthetic. No credentials or network requests are required for the CLI assessment.
 
-## Proposed first working release
+## Requirements and installation
 
-1. A controlled example agent with synthetic public and restricted documents.
-2. Permission-boundary tests for authorized and unauthorized requests.
-3. A test scenario involving malicious instructions in an untrusted document.
-4. An audit trace showing attempted tool actions and authorization decisions.
-5. JSON findings and plain-language explanations, including suggested remediation steps.
+Python 3.11 or newer, with `pip` available.
 
-Future work may include more attack scenarios, additional agent frameworks, and a community security-clinic model. These are intentions, not completed features.
+```bash
+git clone https://github.com/hellomuba/opentrust-ai.git
+cd opentrust-ai
+python3 -m venv .venv
+source .venv/bin/activate  # Windows: .venv\\Scripts\\activate
+python -m pip install -e '.[dev]'
+```
 
-## Intended users
+Run the local assessment and export a structured report:
 
-Nonprofits, independent developers, technical volunteers, community institutions, and small businesses deploying AI agents without specialist security teams. Early user research is planned in Nigeria. No partnerships or deployments are claimed.
+```bash
+opentrust demo
+opentrust demo --format json --output report.json
+python -m pytest -q
+```
 
-## Documentation
+The same CLI is available via `python -m opentrust_ai demo --format json`. A nonzero exit code indicates at least one failed assessment check.
 
-- [Threat model](docs/threat-model.md)
-- [MVP specification](docs/mvp-spec.md)
-- [Roadmap](docs/roadmap.md)
-- [Contributing](CONTRIBUTING.md)
-- [Responsible security testing](SECURITY.md)
+### Optional local FastAPI adapter
 
-## Proposed technology
+The API runs the **same four fixed synthetic tests**. It cannot access a remote target or user-specified repositories.
 
-Python, pytest, a local command-line test runner, structured JSON reports, and potentially FastAPI. LangGraph and LangChain adapters can be considered after an initial testing contract is validated. Final choices will follow implementation.
+```bash
+python -m pip install -e '.[api]'
+uvicorn opentrust_ai.api:app --host 127.0.0.1 --port 8000
+curl -X POST http://127.0.0.1:8000/v1/assessments/demo
+```
 
-## Principles
+`GET /healthz` returns a health indicator. The demonstration API has no authentication; **do not expose it on a public network**. The API is optional and not used by the core CLI assessment.
 
-- Test behavior, not marketing claims.
-- Enforce access control in tools and APIs, not only in prompts.
-- Use synthetic fixtures, not customer or employer data.
-- Produce actionable findings with explicit limitations.
-- Work openly and incorporate user feedback.
+## Repository layout
 
-## Maintainer
+```text
+src/opentrust_ai/
+  fixtures.py     # Fictional principals, classifications, and documents
+  policy.py       # Default-deny role authorization
+  tool.py         # Authorization-enforcing document retrieval
+  agent.py        # Deterministic agent with no LLM dependencies
+  audit.py        # Per-scenario metadata-only access traces
+  assessment.py   # Security scenarios and pass/fail evaluation
+  reporting.py    # JSON and readable terminal output
+  cli.py          # Local command-line runner
+  api.py          # Optional localhost-only FastAPI adapter
+tests/            # Policy, agent, injection, audit, and report tests
+```
 
-**Mubarak Ibrahim** · [GitHub](https://github.com/hellomuba) · [Portfolio](https://hellomuba.github.io)
+## Security model and limitations
 
-## License
+- Authorization occurs inside the document retrieval tool; instructions in source documents cannot grant access.
+- Principal roles come from trusted fixture data, not from caller-provided role fields.
+- Untrusted document text is never executed, and the audit trail does not contain document bodies.
+- This demo is deterministic and **does not contain a generative model**. The injection check validates only that this simple agent makes no extra tool calls in response to the injected text. It does not measure prompt-injection detection or safety for LangChain, LangGraph, or third-party agents.
+- The fixture store is in memory, there is no real identity verification, no persistence, no authorization for API clients, and no real integrations. Do not deploy it against live data.
 
-[Apache License 2.0](LICENSE). Only independently owned or appropriately licensed contributions should be added.
+See the [MVP specification](docs/mvp-spec.md), [roadmap](docs/roadmap.md), [contributing guidelines](CONTRIBUTING.md), and [responsible security testing policy](SECURITY.md). Assess only systems you own or are explicitly authorized to test.
 
-**Disclaimer:** OpenTrust is not a security certification and cannot guarantee that a system is safe.
+## Maintainer and license
+
+Mubarak Ibrahim · [GitHub](https://github.com/hellomuba) · [Portfolio](https://hellomuba.github.io)
+
+Apache License 2.0. Only independently owned or appropriately licensed contributions should be included.
