@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "opentrust-ai"
+version = "0.1.0"
+description = "Local, reproducible security assessments for a synthetic AI-agent demo"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "Apache-2.0"
+authors = [{ name = "Mubarak Ibrahim" }]
+keywords = ["agent-security", "authorization", "prompt-injection", "security-testing"]
+dependencies = []
+
+[project.optional-dependencies]
+api = ["fastapi>=0.115,<1", "uvicorn>=0.30,<1"]
+dev = ["pytest>=8,<10", "httpx>=0.27,<1", "fastapi>=0.115,<1"]
+
+[project.scripts]
+opentrust = "opentrust_ai.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
